@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>🌧️ ULTIMATE Ultra-Realistic 2D Rain Physics Animation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            color: white;
+            overflow: hidden;
+            user-select: none;
+        }
+        
+        #gameCanvas {
+            display: block;
+            margin: 0 auto;
+            background: linear-gradient(to bottom, #87ceeb 0%, #98d4f0 30%, #a9ddf5 100%);
+            border: 3px solid #fff;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+            cursor: crosshair;
+        }
+        
+        .controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 15px;
+            border: 2px solid #ffc107;
+            backdrop-filter: blur(10px);
+        }
+        
+        .btn {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+            border: none;
+            color: white;
+            padding: 12px 24px;
+            margin: 5px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255,107,107,0.4);
+        }
+        
+        .btn.running {
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+        }
+        
+        .math-display {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(25,25,25,0.9);
+            padding: 20px;
+            border-radius: 15px;
+            border: 2px solid #2196f3;
+            font-size: 16px;
+            line-height: 1.6;
+            max-width: 400px;
+        }
+        
+        .vector-label {
+            font-weight: bold;
+            padding: 3px 8px;
+            border-radius: 5px;
+            font-size: 12px;
+        }
+        
+        .rain-ground { color: #4ade80; background: rgba(74,222,128,0.2); }
+        .rain-man { color: #ef4444; background: rgba(239,68,68,0.2); }
+        .man-velocity { color: #3b82f6; background: rgba(59,130,246,0.2); }
+        .angle-theta { color: #f59e0b; background: rgba(245,158,11,0.2); }
+    </style>
+</head>
+<body>
+
+<div class="controls">
+    <h3>🎮 Physics Controls</h3>
+    <button class="btn" id="playBtn">▶️ Start Running</button>
+    <button class="btn" id="pauseBtn">⏸️ Pause</button>
+    <button class="btn" id="resetBtn">🔄 Reset</button>
+    <br>
+    <label>Rain Intensity: <input type="range" id="rainSlider" min="50" max="300" value="150"></label>
+    <br>
+    <label>Man Speed: <input type="range" id="speedSlider" min="0.5" max="4" step="0.1" value="2"></label>
+</div>
+
+<div class="math-display" id="mathDisplay">
+    <h3>📐 Physics Analysis</h3>
+    <div id="currentPhase">Phase: Man holding umbrella at angle θ</div>
+    <div id="formula">v⃗<sub>rain,rel</sub> = v⃗<sub>rain,ground</sub></div>
+    <div id="explanation">Rain hits umbrella diagonally</div>
+</div>
+
+<canvas id="gameCanvas" width="1200" height="700"></canvas>
+
+<script>
+// ========== ULTRA-REALISTIC 2D CANVAS SETUP ==========
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// High DPI support for ultra-crisp graphics
+const dpi = window.devicePixelRatio || 1;
+canvas.width *= dpi;
+canvas.height *= dpi;
+ctx.scale(dpi, dpi);
+
+// ========== ANIMATION STATE ==========
+let animationState = {
+    isRunning: false,
+    isPaused: false,
+    manPosition: 200,
+    manSpeed: 2,
+    hasUmbrella: true,
+    umbrellaThrown: false,
+    rainIntensity: 150,
+    time: 0,
+    phase: 'stationary' // 'stationary' | 'running'
+};
+
+// ========== REALISTIC HUMAN CHARACTER ==========
+class RealisticMan {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.width = 40;
+        this.height = 120;
+        this.runCycle = 0;
+        this.armSwing = 0;
+    }
+    
+    draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        
+        // Body animation during running
+        if (animationState.isRunning) {
+            this.runCycle += 0.3;
+            this.armSwing = Math.sin(this.runCycle) * 10;
+            ctx.translate(0, Math.sin(this.runCycle * 2) * 2); // Bobbing motion
+            ctx.rotate(Math.sin(this.runCycle) * 0.05); // Body lean
+        }
+        
+        // Head
+        ctx.fillStyle = '#fdbcb4';
+        ctx.beginPath();
+        ctx.ellipse(0, -100, 18, 22, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Hair
+        ctx.fillStyle = '#8b4513';
+        ctx.beginPath();
+        ctx.ellipse(0, -110, 20, 15, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Eyes
+        ctx.fillStyle = 'black';
+        ctx.fillRect(-8, -105, 4, 3);
+        ctx.fillRect(4, -105, 4, 3);
+        
+        // Body (torso)
+        ctx.fillStyle = '#4169e1';
+        ctx.fillRect(-15, -80, 30, 50);
+        
+        // Arms
+        ctx.fillStyle = '#fdbcb4';
+        // Left arm
+        ctx.save();
+        ctx.translate(-20, -70);
+        ctx.rotate(this.armSwing * Math.PI / 180);
+        ctx.fillRect(-5, 0, 10, 40);
+        ctx.restore();
+        
+        // Right arm (holding umbrella or swinging)
+        ctx.save();
+        ctx.translate(20, -70);
+        if (!animationState.hasUmbrella) {
+            ctx.rotate(-this.armSwing * Math.PI / 180);
+        }
+        ctx.fillRect(-5, 0, 10, 40);
+        ctx.restore();
+        
+        // Legs
+        ctx.fillStyle = '#333333';
+        if (animationState.isRunning) {
+            // Animated running legs
+            let leftLeg = Math.sin(this.runCycle) * 20;
+            let rightLeg = Math.sin(this.runCycle + Math.PI) * 20;
+            
+            // Left leg
+            ctx.save();
+            ctx.translate(-10, -30);
+            ctx.rotate(leftLeg * Math.PI / 180);
+            ctx.fillRect(-5, 0, 10, 45);
+            ctx.restore();
+            
+            // Right leg  
+            ctx.save();
+            ctx.translate(10, -30);
+            ctx.rotate(rightLeg * Math.PI / 180);
+            ctx.fillRect(-5, 0, 10, 45);
+            ctx.restore();
+        } else {
+            // Standing legs
+            ctx.fillRect(-15, -30, 12, 45);
+            ctx.fillRect(3, -30, 12, 45);
+        }
+        
+        // Feet
+        ctx.fillStyle = '#654321';
+        ctx.fillRect(-18, 15, 20, 8);
+        ctx.fillRect(0, 15, 20, 8);
+        
+        ctx.restore();
+    }
+}
+
+// ========== ULTRA-REALISTIC UMBRELLA ==========
+class RealisticUmbrella {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.angle = -Math.PI / 6; // 30 degrees
+        this.thrown = false;
+        this.velocity = { x: 0, y: 0 };
+        this.rotation = 0;
+    }
+    
+    draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.angle);
+        
+        if (this.thrown) {
+            ctx.rotate(this.rotation);
+        }
+        
+        // Umbrella handle
+        ctx.strokeStyle = '#8b4513';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(0, -60);
+        ctx.stroke();
+        
+        // Umbrella canopy
+        ctx.fillStyle = '#dc143c';
+        ctx.strokeStyle = '#8b0000';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.ellipse(0, -60, 45, 25, 0, Math.PI, 0);
+        ctx.fill();
+        ctx.stroke();
+        
+        // Umbrella ribs
+        ctx.strokeStyle = '#333333';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 8; i++) {
+            let angle = (Math.PI * i) / 7;
+            let x = Math.cos(angle) * 40;
+            let y = Math.sin(angle) * -20;
+            ctx.beginPath();
+            ctx.moveTo(0, -60);
+            ctx.lineTo(x, y - 60);
+            ctx.stroke();
+        }
+        
+        ctx.restore();
+    }
+    
+    throw() {
+        if (!this.thrown) {
+            this.thrown = true;
+            this.velocity.x = 3 + Math.random() * 2;
+            this.velocity.y = -5 - Math.random() * 3;
+            animationState.hasUmbrella = false;
+        }
+    }
+    
+    update() {
+        if (this.thrown) {
+            this.x += this.velocity.x;
+            this.y += this.velocity.y;
+            this.velocity.y += 0.2; // gravity
+            this.rotation += 0.1;
+            
+            // Bounce off ground
+            if (this.y > canvas.height / dpi - 50) {
+                this.velocity.y *= -0.3;
+                this.velocity.x *= 0.8;
+            }
+        }
+    }
+}
+
+// ========== ULTRA-REALISTIC RAIN SYSTEM ==========
+class RainDrop {
+    constructor() {
+        this.reset();
+        this.y = Math.random() * canvas.height / dpi; // Start at random heights initially
+    }
+    
+    reset() {
+        this.x = Math.random() * (canvas.width / dpi + 200) - 100;
+        this.y = -20;
+        this.speed = 8 + Math.random() * 4;
+        this.angle = animationState.isRunning ? 0 : 0.3; // Vertical when running
+        this.length = 15 + Math.random() * 10;
+        this.opacity = 0.3 + Math.random() * 0.4;
+    }
+    
+    update() {
+        if (animationState.isRunning) {
+            // Rain appears vertical relative to running man
+            this.x += 0;
+            this.y += this.speed;
+        } else {
+            // Diagonal rain when stationary
+            this.x += this.speed * this.angle;
+            this.y += this.speed;
+        }
+        
+        if (this.y > canvas.height / dpi + 20) {
+            this.reset();
+        }
+    }
+    
+    draw() {
+        ctx.save();
+        ctx.globalAlpha = this.opacity;
+        ctx.strokeStyle = '#4fc3f7';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y);
+        
+        if (animationState.isRunning) {
+            ctx.lineTo(this.x, this.y + this.length);
+        } else {
+            ctx.lineTo(this.x + this.length * this.angle, this.y + this.length);
+        }
+        
+        ctx.stroke();
+        ctx.restore();
+    }
+}
+
+// ========== PHYSICS VECTOR SYSTEM ==========
+class VectorArrow {
+    constructor(x, y, dx, dy, color, label) {
+        this.x = x;
+        this.y = y;
+        this.dx = dx;
+        this.dy = dy;
+        this.color = color;
+        this.label = label;
+        this.magnitude = Math.sqrt(dx * dx + dy * dy);
+    }
+    
+    draw() {
+        ctx.save();
+        
+        // Arrow shaft
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y);
+        ctx.lineTo(this.x + this.dx, this.y + this.dy);
+        ctx.stroke();
+        
+        // Arrow head
+        let angle = Math.atan2(this.dy, this.dx);
+        let headSize = 15;
+        
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.moveTo(this.x + this.dx, this.y + this.dy);
+        ctx.lineTo(
+            this.x + this.dx - headSize * Math.cos(angle - Math.PI/6),
+            this.y + this.dy - headSize * Math.sin(angle - Math.PI/6)
+        );
+        ctx.lineTo(
+            this.x + this.dx - headSize * Math.cos(angle + Math.PI/6),
+            this.y + this.dy - headSize * Math.sin(angle + Math.PI/6)
+        );
+        ctx.closePath();
+        ctx.fill();
+        
+        // Label
+        ctx.fillStyle = this.color;
+        ctx.font = 'bold 14px Arial';
+        ctx.fillText(this.label, this.x + this.dx + 10, this.y + this.dy - 10);
+        
+        ctx.restore();
+    }
+}
+
+// ========== INITIALIZE OBJECTS ==========
+let man = new RealisticMan(200, canvas.height / dpi - 50);
+let umbrella = new RealisticUmbrella(220, canvas.height / dpi - 130);
+let raindrops = [];
+
+// Create rain drops
+for (let i = 0; i < animationState.rainIntensity; i++) {
+    raindrops.push(new RainDrop());
+}
+
+// ========== RENDERING FUNCTIONS ==========
+function drawBackground() {
+    // Sky with clouds
+    let gradient = ctx.createLinearGradient(0, 0, 0, canvas.height / dpi);
+    gradient.addColorStop(0, '#87ceeb');
+    gradient.addColorStop(0.3, '#98d4f0');
+    gradient.addColorStop(1, '#a9ddf5');
+    
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width / dpi, canvas.height / dpi);
+    
+    // Clouds
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    for (let i = 0; i < 5; i++) {
+        let x = (i * 250) + (animationState.time * 0.1) % 1500;
+        drawCloud(x, 50 + i * 20);
+    }
+    
+    // Ground
+    ctx.fillStyle = '#2d5016';
+    ctx.fillRect(0, canvas.height / dpi - 50, canvas.width / dpi, 50);
+    
+    // Road
+    ctx.fillStyle = '#555555';
+    ctx.fillRect(0, canvas.height / dpi - 55, canvas.width / dpi, 10);
+    
+    // Road lines
+    ctx.strokeStyle = '#ffff00';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([20, 20]);
+    ctx.beginPath();
+    ctx.moveTo(0, canvas.height / dpi - 50);
+    ctx.lineTo(canvas.width / dpi, canvas.height / dpi - 50);
+    ctx.stroke();
+    ctx.setLineDash([]);
+}
+
+function drawCloud(x, y) {
+    ctx.beginPath();
+    ctx.arc(x, y, 25, 0, Math.PI * 2);
+    ctx.arc(x + 25, y, 35, 0, Math.PI * 2);
+    ctx.arc(x + 50, y, 25, 0, Math.PI * 2);
+    ctx.arc(x + 25, y - 15, 20, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+function drawVectors() {
+    if (!man) return;
+    
+    let baseX = man.x;
+    let baseY = man.y - 150;
+    
+    let vectors = [];
+    
+    if (animationState.isRunning) {
+        // Vector: Rain relative to ground (diagonal, green)
+        vectors.push(new VectorArrow(
+            baseX - 100, baseY,
+            60, 120,
+            '#4ade80', 'v⃗ rain,ground'
+        ));
+        
+        // Vector: Man velocity (horizontal, blue)
+        vectors.push(new VectorArrow(
+            baseX, baseY,
+            100, 0,
+            '#3b82f6', 'v⃗ man'
+        ));
+        
+        // Vector: Rain relative to man (vertical, red)
+        vectors.push(new VectorArrow(
+            baseX + 150, baseY,
+            0, 120,
+            '#ef4444', 'v⃗ rain,man'
+        ));
+    } else {
+        // Only rain vector when stationary
+        vectors.push(new VectorArrow(
+            baseX, baseY,
+            60, 120,
+            '#4ade80', 'v⃗ rain'
+        ));
+        
+        // Angle theta indicator
+        if (animationState.hasUmbrella) {
+            ctx.save();
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 3;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(umbrella.x, umbrella.y);
+            ctx.lineTo(umbrella.x, umbrella.y - 80);
+            ctx.stroke();
+            
+            // Angle arc
+            ctx.strokeStyle = '#f59e0b';
+            ctx.beginPath();
+            ctx.arc(umbrella.x, umbrella.y, 30, -Math.PI/2, umbrella.angle, false);
+            ctx.stroke();
+            
+            ctx.fillStyle = '#f59e0b';
+            ctx.font = 'bold 18px Arial';
+            ctx.fillText('θ', umbrella.x + 35, umbrella.y - 25);
+            ctx.restore();
+        }
+    }
+    
+    vectors.forEach(vector => vector.draw());
+}
+
+function updateMathDisplay() {
+    const mathDisplay = document.getElementById('mathDisplay');
+    const currentPhase = document.getElementById('currentPhase');
+    const formula = document.getElementById('formula');
+    const explanation = document.getElementById('explanation');
+    
+    if (animationState.isRunning) {
+        currentPhase.textContent = 'Phase: Man running, umbrella thrown';
+        formula.innerHTML = 'v⃗<sub>rain,man</sub> = v⃗<sub>rain,ground</sub> - v⃗<sub>man</sub>';
+        explanation.textContent = 'Rain appears vertical relative to running man';
+        mathDisplay.style.borderColor = '#ef4444';
+    } else {
+        currentPhase.textContent = 'Phase: Man holding umbrella at angle θ';
+        formula.innerHTML = 'v⃗<sub>rain,rel</sub> = v⃗<sub>rain,ground</sub>';
+        explanation.textContent = 'Rain hits umbrella diagonally';
+        mathDisplay.style.borderColor = '#4ade80';
+    }
+}
+
+// ========== MAIN ANIMATION LOOP ==========
+function animate() {
+    if (!animationState.isPaused) {
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width / dpi, canvas.height / dpi);
+        
+        // Draw background
+        drawBackground();
+        
+        // Update and draw rain
+        raindrops.forEach(drop => {
+            drop.update();
+            drop.draw();
+        });
+        
+        // Update man position
+        if (animationState.isRunning) {
+            man.x += animationState.manSpeed;
+            animationState.manPosition = man.x;
+            
+            // Reset position if man goes off screen
+            if (man.x > canvas.width / dpi + 50) {
+                man.x = -50;
+            }
+        }
+        
+        // Draw man
+        man.draw();
+        
+        // Update and draw umbrella
+        if (animationState.hasUmbrella && !umbrella.thrown) {
+            umbrella.x = man.x + 20;
+            umbrella.y = man.y - 80;
+        }
+        
+        if (umbrella.thrown || !animationState.hasUmbrella) {
+            umbrella.update();
+        }
+        
+        if (!umbrella.thrown || umbrella.y < canvas.height / dpi - 50) {
+            umbrella.draw();
+        }
+        
+        // Draw physics vectors
+        drawVectors();
+        
+        // Update time
+        animationState.time++;
+        
+        // Update math display
+        updateMathDisplay();
+    }
+    
+    requestAnimationFrame(animate);
+}
+
+// ========== CONTROL FUNCTIONS ==========
+function startRunning() {
+    if (!animationState.isRunning) {
+        animationState.isRunning = true;
+        umbrella.throw();
+        document.getElementById('playBtn').classList.add('running');
+        document.getElementById('playBtn').textContent = '🏃 Running...';
+    }
+}
+
+function pauseAnimation() {
+    animationState.isPaused = !animationState.isPaused;
+    const pauseBtn = document.getElementById('pauseBtn');
+    pauseBtn.textContent = animationState.isPaused ? '▶️ Resume' : '⏸️ Pause';
+}
+
+function resetAnimation() {
+    animationState.isRunning = false;
+    animationState.isPaused = false;
+    animationState.hasUmbrella = true;
+    man.x = 200;
+    umbrella.thrown = false;
+    umbrella.x = 220;
+    umbrella.y = canvas.height / dpi - 130;
+    
+    document.getElementById('playBtn').classList.remove('running');
+    document.getElementById('playBtn').textContent = '▶️ Start Running';
+    document.getElementById('pauseBtn').textContent = '⏸️ Pause';
+}
+
+// ========== EVENT LISTENERS ==========
+document.getElementById('playBtn').addEventListener('click', startRunning);
+document.getElementById('pauseBtn').addEventListener('click', pauseAnimation);
+document.getElementById('resetBtn').addEventListener('click', resetAnimation);
+
+document.getElementById('rainSlider').addEventListener('input', (e) => {
+    const newIntensity = parseInt(e.target.value);
+    const difference = newIntensity - animationState.rainIntensity;
+    
+    if (difference > 0) {
+        for (let i = 0; i < difference; i++) {
+            raindrops.push(new RainDrop());
+        }
+    } else {
+        raindrops.splice(0, Math.abs(difference));
+    }
+    
+    animationState.rainIntensity = newIntensity;
+});
+
+document.getElementById('speedSlider').addEventListener('input', (e) => {
+    animationState.manSpeed = parseFloat(e.target.value);
+});
+
+// Canvas click to start running
+canvas.addEventListener('click', startRunning);
+
+// ========== START ANIMATION ==========
+animate();
+
+console.log('🎬 ULTIMATE Ultra-Realistic 2D Physics Animation Loaded!');
+console.log('🌧️ Features: Realistic graphics, proper physics, interactive controls');
+console.log('🎮 Click canvas or controls to interact!');
+</script>
+
+</body>
+</html>
