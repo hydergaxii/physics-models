@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ULTRA-REALISTIC Cinematic Physics Animation</title>
+  <style>
+    body { 
+      margin: 0; 
+      overflow: hidden; 
+      background: #000; 
+      font-family: 'Arial', sans-serif;
+    }
+    canvas { 
+      display: block; 
+      image-rendering: -webkit-optimize-contrast;
+    }
+    .physics-label {
+      position: absolute;
+      background: rgba(0,0,0,0.85);
+      color: #ffeb3b;
+      font-weight: bold;
+      font-size: 16px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 2px solid #ffc107;
+      pointer-events: none;
+      z-index: 1000;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+      backdrop-filter: blur(5px);
+    }
+    .formula-label {
+      position: absolute;
+      background: rgba(25,25,25,0.95);
+      color: #4fc3f7;
+      font-weight: bold;
+      font-size: 18px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      border: 2px solid #2196f3;
+      pointer-events: none;
+      z-index: 1001;
+      box-shadow: 0 6px 20px rgba(33,150,243,0.3);
+    }
+  </style>
+  <!-- KaTeX for math rendering -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.17.0/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.17.0/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.17.0/dist/contrib/auto-render.min.js"></script>
+  
+  <!-- ES Module Shims for compatibility -->
+  <script async src="https://ga.jspm.io/npm:es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+</head>
+<body>
+
+<!-- Import Map -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+    "postprocessing": "https://cdn.jsdelivr.net/npm/postprocessing@6.35.3/build/index.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+// ========== ULTRA-HIGH QUALITY SCENE SETUP ==========
+const scene = new THREE.Scene();
+
+// HDR environment for ultra-realism
+const rgbeLoader = new RGBELoader();
+rgbeLoader.load('https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/industrial_workshop_foundry_1k.hdr', (texture) => {
+  texture.mapping = THREE.EquirectangularReflectionMapping;
+  scene.environment = texture;
+  scene.background = texture;
+  scene.backgroundBlurriness = 0.3;
+});
+
+// Ultra-high quality camera
+const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.set(-5, 12, 25);
+
+// ULTRA-HIGH QUALITY renderer settings
+const renderer = new THREE.WebGLRenderer({ 
+  antialias: true, 
+  powerPreference: "high-performance",
+  precision: "highp"
+});
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // High DPI support
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.8;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+// POST-PROCESSING for cinema quality
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+
+const bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(window.innerWidth, window.innerHeight),
+  0.4,  // strength
+  0.6,  // radius
+  0.85  // threshold
+);
+composer.addPass(bloomPass);
+
+const ssaoPass = new SSAOPass(scene, camera, window.innerWidth, window.innerHeight);
+ssaoPass.kernelRadius = 8;
+ssaoPass.minDistance = 0.005;
+ssaoPass.maxDistance = 0.1;
+composer.addPass(ssaoPass);
+
+composer.addPass(new OutputPass());
+
+// ========== ULTRA-REALISTIC LIGHTING ==========
+// Ambient light for global illumination
+const ambientLight = new THREE.AmbientLight(0xffffff, 2.5);
+scene.add(ambientLight);
+
+// Main sun light - ultra-realistic
+const sunLight = new THREE.DirectionalLight(0xfff4e6, 8);
+sunLight.position.set(20, 30, 15);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.width = 4096;
+sunLight.shadow.mapSize.height = 4096;
+sunLight.shadow.camera.left = -50;
+sunLight.shadow.camera.right = 50;
+sunLight.shadow.camera.top = 50;
+sunLight.shadow.camera.bottom = -50;
+sunLight.shadow.bias = -0.0001;
+scene.add(sunLight);
+
+// Fill lights for cinematic realism
+const fillLight1 = new THREE.DirectionalLight(0x87ceeb, 3);
+fillLight1.position.set(-15, 20, 10);
+scene.add(fillLight1);
+
+const fillLight2 = new THREE.DirectionalLight(0xffffff, 2);
+fillLight2.position.set(0, -5, 20);
+scene.add(fillLight2);
+
+// ========== ULTRA-REALISTIC PBR GROUND ==========
+const groundGeometry = new THREE.PlaneGeometry(100, 30);
+const groundMaterial = new THREE.MeshPhysicalMaterial({
+  color: 0x2a2a2a,
+  roughness: 0.4,
+  metalness: 0.1,
+  clearcoat: 0.6,
+  clearcoatRoughness: 0.2,
+  reflectivity: 0.8,
+  envMapIntensity: 1.5
+});
+const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// ========== ANIMATION STATE ==========
+let man, umbrella, isRunning = false;
+let umbrellaThrown = null;
+let manSpeed = 0.12;
+let startTime = Date.now();
+const theta = Math.PI / 6; // 30 degrees
+
+// ========== ULTRA-REALISTIC RAIN SYSTEM ==========
+const rainCount = 3500;
+const rainGeometry = new THREE.BufferGeometry();
+const rainPositions = new Float32Array(rainCount * 3);
+
+// Create rain with realistic distribution
+for (let i = 0; i < rainCount; i++) {
+  rainPositions[i * 3] = (Math.random() - 0.5) * 120;     // x
+  rainPositions[i * 3 + 1] = Math.random() * 40 + 20;     // y  
+  rainPositions[i * 3 + 2] = (Math.random() - 0.5) * 40;  // z
+}
+
+rainGeometry.setAttribute('position', new THREE.BufferAttribute(rainPositions, 3));
+
+// Ultra-realistic rain material
+const rainMaterial = new THREE.PointsMaterial({
+  color: 0x4fc3f7,
+  size: 0.25,
+  transparent: true,
+  opacity: 0.8,
+  blending: THREE.AdditiveBlending
+});
+
+const rain = new THREE.Points(rainGeometry, rainMaterial);
+scene.add(rain);
+
+// ========== LOAD ULTRA-REALISTIC MODELS ==========
+const loader = new GLTFLoader();
+
+// Load realistic man model
+loader.load(
+  'https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb',
+  (gltf) => {
+    man = gltf.scene;
+    man.scale.set(1.2, 1.2, 1.2);
+    man.position.set(-15, 0, 0);
+    
+    // Apply ultra-realistic PBR materials
+    man.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        if (child.material) {
+          child.material = new THREE.MeshPhysicalMaterial({
+            color: child.material.color || new THREE.Color(0x666666),
+            roughness: 0.6,
+            metalness: 0.2,
+            clearcoat: 0.3,
+            envMapIntensity: 2
+          });
+        }
+      }
+    });
+    scene.add(man);
+    
+    // Create realistic umbrella positioned correctly
+    createRealisticUmbrella();
+  },
+  undefined,
+  (error) => console.error('Error loading man model:', error)
+);
+
+// ========== CREATE ULTRA-REALISTIC UMBRELLA ==========
+function createRealisticUmbrella() {
+  if (!man) return;
+  
+  const umbrellaGroup = new THREE.Group();
+  
+  // Umbrella canopy - ultra-realistic
+  const canopyGeometry = new THREE.ConeGeometry(3, 0.8, 16);
+  const canopyMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0xcc2222,
+    roughness: 0.3,
+    metalness: 0.1,
+    clearcoat: 0.8,
+    clearcoatRoughness: 0.1,
+    transmission: 0.1,
+    thickness: 0.1,
+    envMapIntensity: 1.5
+  });
+  const canopy = new THREE.Mesh(canopyGeometry, canopyMaterial);
+  canopy.position.y = 0.4;
+  canopy.castShadow = true;
+  canopy.receiveShadow = true;
+  
+  // Umbrella ribs for realism
+  const ribGeometry = new THREE.CylinderGeometry(0.02, 0.02, 3);
+  const ribMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0x333333,
+    roughness: 0.2,
+    metalness: 0.8,
+    envMapIntensity: 2
+  });
+  
+  for (let i = 0; i < 8; i++) {
+    const rib = new THREE.Mesh(ribGeometry, ribMaterial);
+    rib.position.set(
+      Math.cos(i * Math.PI / 4) * 1.2,
+      0.4,
+      Math.sin(i * Math.PI / 4) * 1.2
+    );
+    rib.rotation.z = Math.PI / 3;
+    rib.rotation.y = i * Math.PI / 4;
+    rib.castShadow = true;
+    umbrellaGroup.add(rib);
+  }
+  
+  // Umbrella handle - ultra-realistic
+  const handleGeometry = new THREE.CylinderGeometry(0.08, 0.08, 2.5);
+  const handleMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0x4a2c17,
+    roughness: 0.8,
+    metalness: 0.1,
+    envMapIntensity: 1
+  });
+  const handle = new THREE.Mesh(handleGeometry, handleMaterial);
+  handle.position.y = -0.8;
+  handle.castShadow = true;
+  
+  umbrellaGroup.add(canopy);
+  umbrellaGroup.add(handle);
+  
+  // Position correctly relative to man's hand
+  umbrellaGroup.position.set(man.position.x + 1.5, 3.2, man.position.z + 0.3);
+  umbrellaGroup.rotation.z = -theta; // Tilt at angle θ
+  umbrellaGroup.rotation.x = -0.2;
+  
+  umbrella = umbrellaGroup;
+  scene.add(umbrella);
+}
+
+// ========== ULTRA-REALISTIC VECTOR SYSTEM ==========
+let vectorArrows = [];
+let mathLabels = [];
+
+function createUltraVector(origin, direction, color, length, label) {
+  // Ultra-realistic arrow with proper materials
+  const arrowHelper = new THREE.ArrowHelper(
+    direction.normalize(), 
+    origin, 
+    length, 
+    color, 
+    length * 0.25, 
+    length * 0.15
+  );
+  
+  // Apply PBR materials to arrow parts
+  arrowHelper.line.material = new THREE.MeshPhysicalMaterial({
+    color: color,
+    roughness: 0.2,
+    metalness: 0.8,
+    envMapIntensity: 2
+  });
+  
+  arrowHelper.cone.material = new THREE.MeshPhysicalMaterial({
+    color: color,
+    roughness: 0.1,
+    metalness: 0.9,
+    envMapIntensity: 2.5
+  });
+  
+  scene.add(arrowHelper);
+  vectorArrows.push(arrowHelper);
+  
+  return arrowHelper;
+}
+
+// ========== MATHEMATICAL NOTATION SYSTEM ==========
+function createMathLabel(latex, position, className = 'physics-label') {
+  const div = document.createElement('div');
+  div.className = className;
+  
+  // Render LaTeX with KaTeX
+  if (window.katex) {
+    katex.render(latex, div, {
+      throwOnError: false,
+      displayMode: false
+    });
+  } else {
+    div.innerHTML = latex;
+  }
+  
+  document.body.appendChild(div);
+  mathLabels.push({ dom: div, worldPos: position.clone() });
+  return div;
+}
+
+function updateMathLabels() {
+  mathLabels.forEach(label => {
+    if (label.dom && label.worldPos) {
+      const screenPos = label.worldPos.clone();
+      screenPos.project(camera);
+      
+      const x = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
+      const y = (-screenPos.y * 0.5 + 0.5) * window.innerHeight;
+      
+      label.dom.style.left = Math.round(x) + 'px';
+      label.dom.style.top = Math.round(y) + 'px';
+    }
+  });
+}
+
+// ========== ANIMATION FUNCTIONS ==========
+function updateRain() {
+  const positions = rain.geometry.attributes.position.array;
+  
+  for (let i = 0; i < rainCount; i++) {
+    if (isRunning) {
+      // Rain appears vertical relative to running man
+      positions[i * 3 + 1] -= 1.2; // Only vertical fall
+    } else {
+      // Diagonal rain when man is stationary
+      positions[i * 3] += 0.25;     // horizontal drift
+      positions[i * 3 + 1] -= 1.2;  // vertical fall
+    }
+    
+    // Reset rain particles
+    if (positions[i * 3 + 1] < 0) {
+      positions[i * 3] = (Math.random() - 0.5) * 120;
+      positions[i * 3 + 1] = Math.random() * 30 + 40;
+      positions[i * 3 + 2] = (Math.random() - 0.5) * 40;
+    }
+  }
+  
+  rain.geometry.attributes.position.needsUpdate = true;
+}
+
+function updateVectors() {
+  // Clear existing vectors and labels
+  vectorArrows.forEach(arrow => scene.remove(arrow));
+  vectorArrows = [];
+  
+  mathLabels.forEach(label => {
+    if (label.dom) document.body.removeChild(label.dom);
+  });
+  mathLabels = [];
+  
+  if (!man) return;
+  
+  const basePos = man.position.clone().add(new THREE.Vector3(0, 5, 0));
+  
+  if (isRunning) {
+    // Rain velocity relative to ground (green)
+    createUltraVector(
+      basePos.clone().add(new THREE.Vector3(-4, 0, 0)),
+      new THREE.Vector3(0.25, -1.2, 0),
+      0x00ff88,
+      5
+    );
+    createMathLabel('\\vec{v}_{\\text{rain,ground}}', basePos.clone().add(new THREE.Vector3(-4, 3, 0)));
+    
+    // Man velocity (blue)  
+    createUltraVector(
+      basePos.clone(),
+      new THREE.Vector3(1, 0, 0),
+      0x2196f3,
+      4
+    );
+    createMathLabel('\\vec{v}_{\\text{man}}', basePos.clone().add(new THREE.Vector3(2, 2, 0)));
+    
+    // Rain velocity relative to man (red) - VERTICAL
+    createUltraVector(
+      basePos.clone().add(new THREE.Vector3(4, 0, 0)),
+      new THREE.Vector3(0, -1, 0),
+      0xff4444,
+      5
+    );
+    createMathLabel('\\vec{v}_{\\text{rain,man}}', basePos.clone().add(new THREE.Vector3(4, 3, 0)));
+    
+    // Formula
+    createMathLabel(
+      '\\vec{v}_{\\text{rain,man}} = \\vec{v}_{\\text{rain,ground}} - \\vec{v}_{\\text{man}}',
+      basePos.clone().add(new THREE.Vector3(0, -3, 0)),
+      'formula-label'
+    );
+    
+    // Main annotation
+    createMathLabel('Man runs at speed v; rain appears vertical relative to him', basePos.clone().add(new THREE.Vector3(0, 7, 0)));
+    
+  } else {
+    // Stationary case
+    createUltraVector(
+      basePos.clone(),
+      new THREE.Vector3(0.25, -1.2, 0),
+      0x00ff88,
+      5
+    );
+    createMathLabel('\\vec{v}_{\\text{rain}}', basePos.clone().add(new THREE.Vector3(2, 3, 0)));
+    
+    if (umbrella) {
+      createMathLabel('\\theta', umbrella.position.clone().add(new THREE.Vector3(1, 1, 0)));
+    }
+    
+    createMathLabel('Man holds umbrella at angle \\theta; rain hits umbrella', basePos.clone().add(new THREE.Vector3(0, 7, 0)));
+  }
+}
+
+function throwUmbrella() {
+  if (!umbrella || umbrellaThrown) return;
+  
+  // Create thrown umbrella with physics
+  umbrellaThrown = umbrella.clone();
+  umbrellaThrown.userData.velocity = new THREE.Vector3(0.8, 1.2, 0.2);
+  umbrellaThrown.userData.angularVelocity = new THREE.Vector3(0.1, 0.2, 0.15);
+  scene.add(umbrellaThrown);
+  
+  scene.remove(umbrella);
+  umbrella = null;
+}
+
+function updateThrownUmbrella() {
+  if (!umbrellaThrown) return;
+  
+  // Physics simulation
+  umbrellaThrown.position.add(umbrellaThrown.userData.velocity);
+  umbrellaThrown.userData.velocity.y -= 0.025; // gravity
+  
+  umbrellaThrown.rotation.x += umbrellaThrown.userData.angularVelocity.x;
+  umbrellaThrown.rotation.y += umbrellaThrown.userData.angularVelocity.y;
+  umbrellaThrown.rotation.z += umbrellaThrown.userData.angularVelocity.z;
+  
+  // Remove when hits ground
+  if (umbrellaThrown.position.y < 0) {
+    scene.remove(umbrellaThrown);
+    umbrellaThrown = null;
+  }
+}
+
+function updateCamera() {
+  if (man) {
+    // Cinematic camera movement
+    const targetX = man.position.x + 8;
+    const targetY = 12;
+    const targetZ = 25;
+    
+    camera.position.x += (targetX - camera.position.x) * 0.02;
+    camera.position.y += (targetY - camera.position.y) * 0.02; 
+    camera.position.z += (targetZ - camera.position.z) * 0.02;
+    
+    // Dynamic camera shake for realism
+    camera.position.y += Math.sin(Date.now() * 0.002) * 0.1;
+    camera.position.x += Math.cos(Date.now() * 0.0015) * 0.05;
+    
+    camera.lookAt(man.position.x, 3, 0);
+  }
+}
+
+// ========== MAIN ULTRA-REALISTIC ANIMATION LOOP ==========
+function animate() {
+  requestAnimationFrame(animate);
+  
+  const elapsedTime = (Date.now() - startTime) / 1000;
+  
+  // Start running sequence after 7 seconds
+  if (elapsedTime > 7 && !isRunning) {
+    isRunning = true;
+    throwUmbrella();
+  }
+  
+  // Update all systems
+  updateRain();
+  
+  if (isRunning && man) {
+    man.position.x += manSpeed;
+    
+    // Add realistic running animation bob
+    man.position.y = Math.sin(elapsedTime * 8) * 0.1;
+    man.rotation.z = Math.sin(elapsedTime * 8) * 0.05;
+  }
+  
+  updateThrownUmbrella();
+  updateVectors();
+  updateMathLabels();
+  updateCamera();
+  
+  // Ultra-high quality render with post-processing
+  composer.render();
+}
+
+// Wait for KaTeX to load before starting
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    animate();
+  }, 1000);
+});
+
+// ========== RESPONSIVE & OPTIMIZATION ==========
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  composer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// Click to manually start running
+window.addEventListener('click', () => {
+  if (!isRunning) {
+    isRunning = true;
+    throwUmbrella();
+  }
+});
+
+console.log('🎬 ULTRA-REALISTIC Physics Animation Loaded!');
+console.log('🔥 Features: PBR Materials, SSAO, Bloom, HDR Environment, KaTeX Math');
+console.log('⚡ Click to start running sequence early!');
+
+</script>
+
+</body>
+</html>
