@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🌧️ ULTIMATE Ultra-Realistic 2D Rain Physics Animation</title>
     <style>
         * {
@@ -69,23 +70,43 @@
             padding: 20px;
             border-radius: 15px;
             border: 2px solid #2196f3;
-            font-size: 16px;
-            line-height: 1.6;
+            font-size: 18px;
+            line-height: 1.8;
             max-width: 400px;
+            font-family: 'Times New Roman', serif;
         }
         
-        .vector-label {
+        .math-formula {
+            background: rgba(33, 150, 243, 0.1);
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border-left: 4px solid #2196f3;
+            font-size: 20px;
+            text-align: center;
+        }
+        
+        .vector-notation {
             font-weight: bold;
-            padding: 3px 8px;
-            border-radius: 5px;
-            font-size: 12px;
+            font-size: 18px;
         }
-        
-        .rain-ground { color: #4ade80; background: rgba(74,222,128,0.2); }
-        .rain-man { color: #ef4444; background: rgba(239,68,68,0.2); }
-        .man-velocity { color: #3b82f6; background: rgba(59,130,246,0.2); }
-        .angle-theta { color: #f59e0b; background: rgba(245,158,11,0.2); }
     </style>
+    
+    <!-- MathJax for perfect math rendering -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true
+            },
+            options: {
+                skipHtmlTags: ['canvas', 'script', 'noscript', 'style', 'textarea', 'pre']
+            }
+        };
+    </script>
+    <script async src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script async id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
 <body>
 
@@ -103,18 +124,34 @@
 <div class="math-display" id="mathDisplay">
     <h3>📐 Physics Analysis</h3>
     <div id="currentPhase">Phase: Man holding umbrella at angle θ</div>
-    <div id="formula">v⃗<sub>rain,rel</sub> = v⃗<sub>rain,ground</sub></div>
+    <div class="math-formula" id="formula">
+        v⃗<sub>rain,rel</sub> = v⃗<sub>rain,ground</sub>
+    </div>
     <div id="explanation">Rain hits umbrella diagonally</div>
 </div>
 
 <canvas id="gameCanvas" width="1200" height="700"></canvas>
 
 <script>
-// ========== ULTRA-REALISTIC 2D CANVAS SETUP ==========
+// ========== UNICODE MATH SYMBOLS ==========
+const MATH = {
+    vector: '⃗',
+    theta: 'θ',
+    sub: {
+        'rain,rel': '₍ᵣₐᵢₙ,ᵣₑₗ₎',
+        'rain,ground': '₍ᵣₐᵢₙ,gᵣₒᵤₙ𝒹₎', 
+        'rain,man': '₍ᵣₐᵢₙ,ₘₐₙ₎',
+        'man': '₍ₘₐₙ₎'
+    },
+    equals: '=',
+    minus: '−'
+};
+
+// ========== CANVAS SETUP ==========
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-// High DPI support for ultra-crisp graphics
+// High DPI support
 const dpi = window.devicePixelRatio || 1;
 canvas.width *= dpi;
 canvas.height *= dpi;
@@ -130,7 +167,7 @@ let animationState = {
     umbrellaThrown: false,
     rainIntensity: 150,
     time: 0,
-    phase: 'stationary' // 'stationary' | 'running'
+    phase: 'stationary'
 };
 
 // ========== REALISTIC HUMAN CHARACTER ==========
@@ -148,12 +185,11 @@ class RealisticMan {
         ctx.save();
         ctx.translate(this.x, this.y);
         
-        // Body animation during running
         if (animationState.isRunning) {
             this.runCycle += 0.3;
             this.armSwing = Math.sin(this.runCycle) * 10;
-            ctx.translate(0, Math.sin(this.runCycle * 2) * 2); // Bobbing motion
-            ctx.rotate(Math.sin(this.runCycle) * 0.05); // Body lean
+            ctx.translate(0, Math.sin(this.runCycle * 2) * 2);
+            ctx.rotate(Math.sin(this.runCycle) * 0.05);
         }
         
         // Head
@@ -173,7 +209,7 @@ class RealisticMan {
         ctx.fillRect(-8, -105, 4, 3);
         ctx.fillRect(4, -105, 4, 3);
         
-        // Body (torso)
+        // Body
         ctx.fillStyle = '#4169e1';
         ctx.fillRect(-15, -80, 30, 50);
         
@@ -186,7 +222,7 @@ class RealisticMan {
         ctx.fillRect(-5, 0, 10, 40);
         ctx.restore();
         
-        // Right arm (holding umbrella or swinging)
+        // Right arm
         ctx.save();
         ctx.translate(20, -70);
         if (!animationState.hasUmbrella) {
@@ -195,28 +231,24 @@ class RealisticMan {
         ctx.fillRect(-5, 0, 10, 40);
         ctx.restore();
         
-        // Legs
+        // Legs with running animation
         ctx.fillStyle = '#333333';
         if (animationState.isRunning) {
-            // Animated running legs
             let leftLeg = Math.sin(this.runCycle) * 20;
             let rightLeg = Math.sin(this.runCycle + Math.PI) * 20;
             
-            // Left leg
             ctx.save();
             ctx.translate(-10, -30);
             ctx.rotate(leftLeg * Math.PI / 180);
             ctx.fillRect(-5, 0, 10, 45);
             ctx.restore();
             
-            // Right leg  
             ctx.save();
             ctx.translate(10, -30);
             ctx.rotate(rightLeg * Math.PI / 180);
             ctx.fillRect(-5, 0, 10, 45);
             ctx.restore();
         } else {
-            // Standing legs
             ctx.fillRect(-15, -30, 12, 45);
             ctx.fillRect(3, -30, 12, 45);
         }
@@ -235,7 +267,7 @@ class RealisticUmbrella {
     constructor(x, y) {
         this.x = x;
         this.y = y;
-        this.angle = -Math.PI / 6; // 30 degrees
+        this.angle = -Math.PI / 6;
         this.thrown = false;
         this.velocity = { x: 0, y: 0 };
         this.rotation = 0;
@@ -250,7 +282,7 @@ class RealisticUmbrella {
             ctx.rotate(this.rotation);
         }
         
-        // Umbrella handle
+        // Handle
         ctx.strokeStyle = '#8b4513';
         ctx.lineWidth = 4;
         ctx.beginPath();
@@ -258,7 +290,7 @@ class RealisticUmbrella {
         ctx.lineTo(0, -60);
         ctx.stroke();
         
-        // Umbrella canopy
+        // Canopy
         ctx.fillStyle = '#dc143c';
         ctx.strokeStyle = '#8b0000';
         ctx.lineWidth = 2;
@@ -267,7 +299,7 @@ class RealisticUmbrella {
         ctx.fill();
         ctx.stroke();
         
-        // Umbrella ribs
+        // Ribs
         ctx.strokeStyle = '#333333';
         ctx.lineWidth = 1;
         for (let i = 0; i < 8; i++) {
@@ -296,10 +328,9 @@ class RealisticUmbrella {
         if (this.thrown) {
             this.x += this.velocity.x;
             this.y += this.velocity.y;
-            this.velocity.y += 0.2; // gravity
+            this.velocity.y += 0.2;
             this.rotation += 0.1;
             
-            // Bounce off ground
             if (this.y > canvas.height / dpi - 50) {
                 this.velocity.y *= -0.3;
                 this.velocity.x *= 0.8;
@@ -308,29 +339,27 @@ class RealisticUmbrella {
     }
 }
 
-// ========== ULTRA-REALISTIC RAIN SYSTEM ==========
+// ========== RAIN SYSTEM ==========
 class RainDrop {
     constructor() {
         this.reset();
-        this.y = Math.random() * canvas.height / dpi; // Start at random heights initially
+        this.y = Math.random() * canvas.height / dpi;
     }
     
     reset() {
         this.x = Math.random() * (canvas.width / dpi + 200) - 100;
         this.y = -20;
         this.speed = 8 + Math.random() * 4;
-        this.angle = animationState.isRunning ? 0 : 0.3; // Vertical when running
+        this.angle = animationState.isRunning ? 0 : 0.3;
         this.length = 15 + Math.random() * 10;
         this.opacity = 0.3 + Math.random() * 0.4;
     }
     
     update() {
         if (animationState.isRunning) {
-            // Rain appears vertical relative to running man
             this.x += 0;
             this.y += this.speed;
         } else {
-            // Diagonal rain when stationary
             this.x += this.speed * this.angle;
             this.y += this.speed;
         }
@@ -359,53 +388,82 @@ class RainDrop {
     }
 }
 
-// ========== PHYSICS VECTOR SYSTEM ==========
-class VectorArrow {
-    constructor(x, y, dx, dy, color, label) {
-        this.x = x;
-        this.y = y;
-        this.dx = dx;
-        this.dy = dy;
-        this.color = color;
-        this.label = label;
-        this.magnitude = Math.sqrt(dx * dx + dy * dy);
+// ========== VECTOR DRAWING WITH PERFECT MATH NOTATION ==========
+function drawVectorWithMath(x, y, dx, dy, color, label) {
+    ctx.save();
+    
+    // Arrow shaft
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + dx, y + dy);
+    ctx.stroke();
+    
+    // Arrow head
+    let angle = Math.atan2(dy, dx);
+    let headSize = 15;
+    
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x + dx, y + dy);
+    ctx.lineTo(
+        x + dx - headSize * Math.cos(angle - Math.PI/6),
+        y + dy - headSize * Math.sin(angle - Math.PI/6)
+    );
+    ctx.lineTo(
+        x + dx - headSize * Math.cos(angle + Math.PI/6),
+        y + dy - headSize * Math.sin(angle + Math.PI/6)
+    );
+    ctx.closePath();
+    ctx.fill();
+    
+    // Perfect Math Label with Unicode
+    ctx.fillStyle = color;
+    ctx.font = 'bold 16px Times New Roman, serif';
+    ctx.textAlign = 'center';
+    
+    // Use Unicode for vector notation
+    let vectorLabel = label.replace('v⃗', 'v⃗');
+    ctx.fillText(vectorLabel, x + dx/2, y + dy/2 - 10);
+    
+    ctx.restore();
+}
+
+// ========== PERFECT MATH NOTATION RENDERING ==========
+function renderMathNotation() {
+    // Update math display with perfect Unicode symbols
+    const formula = document.getElementById('formula');
+    const currentPhase = document.getElementById('currentPhase');
+    const explanation = document.getElementById('explanation');
+    
+    if (animationState.isRunning) {
+        currentPhase.textContent = 'Phase: Man running, umbrella thrown';
+        
+        // Perfect vector equation with Unicode
+        formula.innerHTML = `
+            <span style="color: #ef4444;">v⃗<sub>rain,man</sub></span> = 
+            <span style="color: #4ade80;">v⃗<sub>rain,ground</sub></span> − 
+            <span style="color: #3b82f6;">v⃗<sub>man</sub></span>
+        `;
+        
+        explanation.innerHTML = 'Rain appears <strong>vertical</strong> relative to running man';
+        document.getElementById('mathDisplay').style.borderColor = '#ef4444';
+    } else {
+        currentPhase.innerHTML = 'Phase: Man holding umbrella at angle <span style="color: #f59e0b;">θ</span>';
+        
+        formula.innerHTML = `
+            <span style="color: #4ade80;">v⃗<sub>rain,rel</sub></span> = 
+            <span style="color: #4ade80;">v⃗<sub>rain,ground</sub></span>
+        `;
+        
+        explanation.textContent = 'Rain hits umbrella diagonally';
+        document.getElementById('mathDisplay').style.borderColor = '#4ade80';
     }
     
-    draw() {
-        ctx.save();
-        
-        // Arrow shaft
-        ctx.strokeStyle = this.color;
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.moveTo(this.x, this.y);
-        ctx.lineTo(this.x + this.dx, this.y + this.dy);
-        ctx.stroke();
-        
-        // Arrow head
-        let angle = Math.atan2(this.dy, this.dx);
-        let headSize = 15;
-        
-        ctx.fillStyle = this.color;
-        ctx.beginPath();
-        ctx.moveTo(this.x + this.dx, this.y + this.dy);
-        ctx.lineTo(
-            this.x + this.dx - headSize * Math.cos(angle - Math.PI/6),
-            this.y + this.dy - headSize * Math.sin(angle - Math.PI/6)
-        );
-        ctx.lineTo(
-            this.x + this.dx - headSize * Math.cos(angle + Math.PI/6),
-            this.y + this.dy - headSize * Math.sin(angle + Math.PI/6)
-        );
-        ctx.closePath();
-        ctx.fill();
-        
-        // Label
-        ctx.fillStyle = this.color;
-        ctx.font = 'bold 14px Arial';
-        ctx.fillText(this.label, this.x + this.dx + 10, this.y + this.dy - 10);
-        
-        ctx.restore();
+    // Re-render MathJax if available
+    if (window.MathJax && window.MathJax.typesetPromise) {
+        MathJax.typesetPromise([document.getElementById('mathDisplay')]);
     }
 }
 
@@ -414,14 +472,13 @@ let man = new RealisticMan(200, canvas.height / dpi - 50);
 let umbrella = new RealisticUmbrella(220, canvas.height / dpi - 130);
 let raindrops = [];
 
-// Create rain drops
 for (let i = 0; i < animationState.rainIntensity; i++) {
     raindrops.push(new RainDrop());
 }
 
-// ========== RENDERING FUNCTIONS ==========
+// ========== BACKGROUND DRAWING ==========
 function drawBackground() {
-    // Sky with clouds
+    // Sky gradient
     let gradient = ctx.createLinearGradient(0, 0, 0, canvas.height / dpi);
     gradient.addColorStop(0, '#87ceeb');
     gradient.addColorStop(0.3, '#98d4f0');
@@ -430,7 +487,7 @@ function drawBackground() {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width / dpi, canvas.height / dpi);
     
-    // Clouds
+    // Animated clouds
     ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
     for (let i = 0; i < 5; i++) {
         let x = (i * 250) + (animationState.time * 0.1) % 1500;
@@ -445,7 +502,7 @@ function drawBackground() {
     ctx.fillStyle = '#555555';
     ctx.fillRect(0, canvas.height / dpi - 55, canvas.width / dpi, 10);
     
-    // Road lines
+    // Road markings
     ctx.strokeStyle = '#ffff00';
     ctx.lineWidth = 3;
     ctx.setLineDash([20, 20]);
@@ -465,46 +522,47 @@ function drawCloud(x, y) {
     ctx.fill();
 }
 
+// ========== VECTOR DRAWING WITH PERFECT MATH ==========
 function drawVectors() {
     if (!man) return;
     
     let baseX = man.x;
     let baseY = man.y - 150;
     
-    let vectors = [];
-    
     if (animationState.isRunning) {
-        // Vector: Rain relative to ground (diagonal, green)
-        vectors.push(new VectorArrow(
+        // Rain relative to ground (diagonal, green)
+        drawVectorWithMath(
             baseX - 100, baseY,
             60, 120,
-            '#4ade80', 'v⃗ rain,ground'
-        ));
+            '#4ade80', 'v⃗rain,ground'
+        );
         
-        // Vector: Man velocity (horizontal, blue)
-        vectors.push(new VectorArrow(
+        // Man velocity (horizontal, blue)  
+        drawVectorWithMath(
             baseX, baseY,
             100, 0,
-            '#3b82f6', 'v⃗ man'
-        ));
+            '#3b82f6', 'v⃗man'
+        );
         
-        // Vector: Rain relative to man (vertical, red)
-        vectors.push(new VectorArrow(
+        // Rain relative to man (vertical, red)
+        drawVectorWithMath(
             baseX + 150, baseY,
             0, 120,
-            '#ef4444', 'v⃗ rain,man'
-        ));
+            '#ef4444', 'v⃗rain,man'
+        );
     } else {
-        // Only rain vector when stationary
-        vectors.push(new VectorArrow(
+        // Rain vector when stationary
+        drawVectorWithMath(
             baseX, baseY,
             60, 120,
-            '#4ade80', 'v⃗ rain'
-        ));
+            '#4ade80', 'v⃗rain'
+        );
         
-        // Angle theta indicator
+        // Theta angle indicator
         if (animationState.hasUmbrella) {
             ctx.save();
+            
+            // Vertical reference line
             ctx.strokeStyle = '#f59e0b';
             ctx.lineWidth = 3;
             ctx.setLineDash([5, 5]);
@@ -515,46 +573,28 @@ function drawVectors() {
             
             // Angle arc
             ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([]);
             ctx.beginPath();
             ctx.arc(umbrella.x, umbrella.y, 30, -Math.PI/2, umbrella.angle, false);
             ctx.stroke();
             
+            // Perfect θ symbol
             ctx.fillStyle = '#f59e0b';
-            ctx.font = 'bold 18px Arial';
-            ctx.fillText('θ', umbrella.x + 35, umbrella.y - 25);
+            ctx.font = 'bold 24px Times New Roman, serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('θ', umbrella.x + 45, umbrella.y - 15);
+            
             ctx.restore();
         }
-    }
-    
-    vectors.forEach(vector => vector.draw());
-}
-
-function updateMathDisplay() {
-    const mathDisplay = document.getElementById('mathDisplay');
-    const currentPhase = document.getElementById('currentPhase');
-    const formula = document.getElementById('formula');
-    const explanation = document.getElementById('explanation');
-    
-    if (animationState.isRunning) {
-        currentPhase.textContent = 'Phase: Man running, umbrella thrown';
-        formula.innerHTML = 'v⃗<sub>rain,man</sub> = v⃗<sub>rain,ground</sub> - v⃗<sub>man</sub>';
-        explanation.textContent = 'Rain appears vertical relative to running man';
-        mathDisplay.style.borderColor = '#ef4444';
-    } else {
-        currentPhase.textContent = 'Phase: Man holding umbrella at angle θ';
-        formula.innerHTML = 'v⃗<sub>rain,rel</sub> = v⃗<sub>rain,ground</sub>';
-        explanation.textContent = 'Rain hits umbrella diagonally';
-        mathDisplay.style.borderColor = '#4ade80';
     }
 }
 
 // ========== MAIN ANIMATION LOOP ==========
 function animate() {
     if (!animationState.isPaused) {
-        // Clear canvas
         ctx.clearRect(0, 0, canvas.width / dpi, canvas.height / dpi);
         
-        // Draw background
         drawBackground();
         
         // Update and draw rain
@@ -566,18 +606,14 @@ function animate() {
         // Update man position
         if (animationState.isRunning) {
             man.x += animationState.manSpeed;
-            animationState.manPosition = man.x;
-            
-            // Reset position if man goes off screen
             if (man.x > canvas.width / dpi + 50) {
                 man.x = -50;
             }
         }
         
-        // Draw man
         man.draw();
         
-        // Update and draw umbrella
+        // Update umbrella
         if (animationState.hasUmbrella && !umbrella.thrown) {
             umbrella.x = man.x + 20;
             umbrella.y = man.y - 80;
@@ -591,14 +627,10 @@ function animate() {
             umbrella.draw();
         }
         
-        // Draw physics vectors
         drawVectors();
+        renderMathNotation();
         
-        // Update time
         animationState.time++;
-        
-        // Update math display
-        updateMathDisplay();
     }
     
     requestAnimationFrame(animate);
@@ -658,15 +690,15 @@ document.getElementById('speedSlider').addEventListener('input', (e) => {
     animationState.manSpeed = parseFloat(e.target.value);
 });
 
-// Canvas click to start running
 canvas.addEventListener('click', startRunning);
 
 // ========== START ANIMATION ==========
 animate();
 
-console.log('🎬 ULTIMATE Ultra-Realistic 2D Physics Animation Loaded!');
-console.log('🌧️ Features: Realistic graphics, proper physics, interactive controls');
-console.log('🎮 Click canvas or controls to interact!');
+console.log('🎬 ULTIMATE 2D Physics Animation with PERFECT Math Notation!');
+console.log('🌧️ Features: Unicode vectors, MathJax support, realistic graphics');
+console.log('🎮 Click to interact!');
+
 </script>
 
 </body>
