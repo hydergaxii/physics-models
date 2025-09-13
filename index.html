@@ -32,11 +32,12 @@
             position: absolute;
             top: 20px;
             left: 20px;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.85);
             padding: 20px;
             border-radius: 15px;
             border: 2px solid #ffc107;
             backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
         }
         
         .btn {
@@ -66,42 +67,58 @@
             position: absolute;
             top: 20px;
             right: 20px;
-            background: rgba(25,25,25,0.9);
-            padding: 20px;
+            background: rgba(25,25,25,0.92);
+            padding: 25px;
             border-radius: 15px;
             border: 2px solid #2196f3;
-            font-size: 18px;
+            font-size: 16px;
             line-height: 1.8;
-            max-width: 400px;
+            max-width: 450px;
             font-family: 'Times New Roman', serif;
+            box-shadow: 0 8px 32px rgba(33,150,243,0.2);
         }
         
         .math-formula {
-            background: rgba(33, 150, 243, 0.1);
-            padding: 10px;
-            border-radius: 8px;
-            margin: 10px 0;
+            background: rgba(33, 150, 243, 0.15);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
             border-left: 4px solid #2196f3;
-            font-size: 20px;
+            font-size: 18px;
             text-align: center;
+            font-family: 'Times New Roman', serif;
         }
         
-        .vector-notation {
+        .phase-display {
+            color: #ffeb3b;
             font-weight: bold;
-            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        
+        .explanation {
+            color: #e0e0e0;
+            font-style: italic;
+            margin-top: 10px;
         }
     </style>
     
-    <!-- MathJax for perfect math rendering -->
+    <!-- MathJax Configuration -->
     <script>
         window.MathJax = {
             tex: {
                 inlineMath: [['$', '$'], ['\\(', '\\)']],
                 displayMath: [['$$', '$$'], ['\\[', '\\]']],
-                processEscapes: true
+                processEscapes: true,
+                packages: {'[+]': ['amsmath', 'amsfonts', 'amssymb']}
             },
             options: {
                 skipHtmlTags: ['canvas', 'script', 'noscript', 'style', 'textarea', 'pre']
+            },
+            startup: {
+                ready: () => {
+                    console.log('MathJax is loaded and ready!');
+                    MathJax.startup.defaultReady();
+                }
             }
         };
     </script>
@@ -115,47 +132,37 @@
     <button class="btn" id="playBtn">▶️ Start Running</button>
     <button class="btn" id="pauseBtn">⏸️ Pause</button>
     <button class="btn" id="resetBtn">🔄 Reset</button>
+    <br><br>
+    <label style="color: #fff;">Rain Intensity: <input type="range" id="rainSlider" min="50" max="300" value="150"></label>
     <br>
-    <label>Rain Intensity: <input type="range" id="rainSlider" min="50" max="300" value="150"></label>
-    <br>
-    <label>Man Speed: <input type="range" id="speedSlider" min="0.5" max="4" step="0.1" value="2"></label>
+    <label style="color: #fff;">Man Speed: <input type="range" id="speedSlider" min="0.5" max="4" step="0.1" value="2"></label>
 </div>
 
 <div class="math-display" id="mathDisplay">
-    <h3>📐 Physics Analysis</h3>
-    <div id="currentPhase">Phase: Man holding umbrella at angle θ</div>
+    <h3 style="color: #2196f3;">📐 Physics Analysis</h3>
+    <div class="phase-display" id="currentPhase">Phase: Man holding umbrella at angle θ</div>
     <div class="math-formula" id="formula">
-        v⃗<sub>rain,rel</sub> = v⃗<sub>rain,ground</sub>
+        $$\vec{v}_{\mathrm{rain,rel}} = \vec{v}_{\mathrm{rain,ground}}$$
     </div>
-    <div id="explanation">Rain hits umbrella diagonally</div>
+    <div class="explanation" id="explanation">Rain hits umbrella diagonally</div>
 </div>
 
 <canvas id="gameCanvas" width="1200" height="700"></canvas>
 
 <script>
-// ========== UNICODE MATH SYMBOLS ==========
-const MATH = {
-    vector: '⃗',
-    theta: 'θ',
-    sub: {
-        'rain,rel': '₍ᵣₐᵢₙ,ᵣₑₗ₎',
-        'rain,ground': '₍ᵣₐᵢₙ,gᵣₒᵤₙ𝒹₎', 
-        'rain,man': '₍ᵣₐᵢₙ,ₘₐₙ₎',
-        'man': '₍ₘₐₙ₎'
-    },
-    equals: '=',
-    minus: '−'
-};
-
 // ========== CANVAS SETUP ==========
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-// High DPI support
+// High DPI support for ultra-crisp graphics
 const dpi = window.devicePixelRatio || 1;
 canvas.width *= dpi;
 canvas.height *= dpi;
 ctx.scale(dpi, dpi);
+
+// Enable image smoothing for better quality
+ctx.imageSmoothingEnabled = true;
+ctx.imageSmoothingQuality = 'high';
 
 // ========== ANIMATION STATE ==========
 let animationState = {
@@ -170,7 +177,7 @@ let animationState = {
     phase: 'stationary'
 };
 
-// ========== REALISTIC HUMAN CHARACTER ==========
+// ========== ULTRA-REALISTIC HUMAN CHARACTER ==========
 class RealisticMan {
     constructor(x, y) {
         this.x = x;
@@ -185,15 +192,19 @@ class RealisticMan {
         ctx.save();
         ctx.translate(this.x, this.y);
         
+        // Running animation
         if (animationState.isRunning) {
-            this.runCycle += 0.3;
-            this.armSwing = Math.sin(this.runCycle) * 10;
-            ctx.translate(0, Math.sin(this.runCycle * 2) * 2);
-            ctx.rotate(Math.sin(this.runCycle) * 0.05);
+            this.runCycle += 0.25;
+            this.armSwing = Math.sin(this.runCycle) * 12;
+            ctx.translate(0, Math.sin(this.runCycle * 2) * 1.5);
+            ctx.rotate(Math.sin(this.runCycle) * 0.03);
         }
         
-        // Head
-        ctx.fillStyle = '#fdbcb4';
+        // Head with gradient for realism
+        let headGradient = ctx.createRadialGradient(-5, -105, 5, 0, -100, 20);
+        headGradient.addColorStop(0, '#fdbcb4');
+        headGradient.addColorStop(1, '#e8a896');
+        ctx.fillStyle = headGradient;
         ctx.beginPath();
         ctx.ellipse(0, -100, 18, 22, 0, 0, Math.PI * 2);
         ctx.fill();
@@ -205,58 +216,89 @@ class RealisticMan {
         ctx.fill();
         
         // Eyes
+        ctx.fillStyle = 'white';
+        ctx.fillRect(-8, -105, 6, 4);
+        ctx.fillRect(2, -105, 6, 4);
         ctx.fillStyle = 'black';
-        ctx.fillRect(-8, -105, 4, 3);
-        ctx.fillRect(4, -105, 4, 3);
+        ctx.fillRect(-6, -104, 2, 2);
+        ctx.fillRect(4, -104, 2, 2);
         
-        // Body
-        ctx.fillStyle = '#4169e1';
+        // Mouth
+        ctx.strokeStyle = '#8b4513';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, -95, 3, 0, Math.PI);
+        ctx.stroke();
+        
+        // Body (shirt)
+        let bodyGradient = ctx.createLinearGradient(-15, -80, 15, -30);
+        bodyGradient.addColorStop(0, '#4169e1');
+        bodyGradient.addColorStop(1, '#1e3a8a');
+        ctx.fillStyle = bodyGradient;
         ctx.fillRect(-15, -80, 30, 50);
         
         // Arms
         ctx.fillStyle = '#fdbcb4';
+        
         // Left arm
         ctx.save();
         ctx.translate(-20, -70);
         ctx.rotate(this.armSwing * Math.PI / 180);
         ctx.fillRect(-5, 0, 10, 40);
+        // Hand
+        ctx.beginPath();
+        ctx.arc(0, 40, 6, 0, Math.PI * 2);
+        ctx.fill();
         ctx.restore();
         
-        // Right arm
+        // Right arm (holding umbrella or swinging)
         ctx.save();
         ctx.translate(20, -70);
         if (!animationState.hasUmbrella) {
             ctx.rotate(-this.armSwing * Math.PI / 180);
         }
         ctx.fillRect(-5, 0, 10, 40);
+        // Hand
+        ctx.beginPath();
+        ctx.arc(0, 40, 6, 0, Math.PI * 2);
+        ctx.fill();
         ctx.restore();
         
-        // Legs with running animation
+        // Legs with realistic running animation
         ctx.fillStyle = '#333333';
         if (animationState.isRunning) {
-            let leftLeg = Math.sin(this.runCycle) * 20;
-            let rightLeg = Math.sin(this.runCycle + Math.PI) * 20;
+            let leftLeg = Math.sin(this.runCycle) * 25;
+            let rightLeg = Math.sin(this.runCycle + Math.PI) * 25;
             
+            // Left leg
             ctx.save();
             ctx.translate(-10, -30);
             ctx.rotate(leftLeg * Math.PI / 180);
-            ctx.fillRect(-5, 0, 10, 45);
+            ctx.fillRect(-6, 0, 12, 45);
+            // Foot
+            ctx.fillStyle = '#654321';
+            ctx.fillRect(-8, 45, 16, 8);
             ctx.restore();
             
+            // Right leg
             ctx.save();
             ctx.translate(10, -30);
             ctx.rotate(rightLeg * Math.PI / 180);
-            ctx.fillRect(-5, 0, 10, 45);
+            ctx.fillRect(-6, 0, 12, 45);
+            // Foot
+            ctx.fillStyle = '#654321';
+            ctx.fillRect(-8, 45, 16, 8);
             ctx.restore();
         } else {
+            // Standing legs
             ctx.fillRect(-15, -30, 12, 45);
             ctx.fillRect(3, -30, 12, 45);
+            
+            // Feet
+            ctx.fillStyle = '#654321';
+            ctx.fillRect(-18, 15, 20, 8);
+            ctx.fillRect(0, 15, 20, 8);
         }
-        
-        // Feet
-        ctx.fillStyle = '#654321';
-        ctx.fillRect(-18, 15, 20, 8);
-        ctx.fillRect(0, 15, 20, 8);
         
         ctx.restore();
     }
@@ -267,7 +309,7 @@ class RealisticUmbrella {
     constructor(x, y) {
         this.x = x;
         this.y = y;
-        this.angle = -Math.PI / 6;
+        this.angle = -Math.PI / 6; // 30 degrees
         this.thrown = false;
         this.velocity = { x: 0, y: 0 };
         this.rotation = 0;
@@ -282,16 +324,32 @@ class RealisticUmbrella {
             ctx.rotate(this.rotation);
         }
         
-        // Handle
-        ctx.strokeStyle = '#8b4513';
-        ctx.lineWidth = 4;
+        // Umbrella handle with wood texture
+        let handleGradient = ctx.createLinearGradient(-2, 0, 2, 0);
+        handleGradient.addColorStop(0, '#8b4513');
+        handleGradient.addColorStop(0.5, '#a0522d');
+        handleGradient.addColorStop(1, '#654321');
+        ctx.strokeStyle = handleGradient;
+        ctx.lineWidth = 5;
+        ctx.lineCap = 'round';
         ctx.beginPath();
         ctx.moveTo(0, 0);
         ctx.lineTo(0, -60);
         ctx.stroke();
         
-        // Canopy
-        ctx.fillStyle = '#dc143c';
+        // Handle grip
+        ctx.fillStyle = '#654321';
+        ctx.beginPath();
+        ctx.arc(0, 5, 4, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Umbrella canopy with gradient
+        let canopyGradient = ctx.createRadialGradient(0, -60, 0, 0, -60, 45);
+        canopyGradient.addColorStop(0, '#dc143c');
+        canopyGradient.addColorStop(0.7, '#b91c3c');
+        canopyGradient.addColorStop(1, '#8b0000');
+        
+        ctx.fillStyle = canopyGradient;
         ctx.strokeStyle = '#8b0000';
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -299,18 +357,24 @@ class RealisticUmbrella {
         ctx.fill();
         ctx.stroke();
         
-        // Ribs
+        // Umbrella ribs for realism
         ctx.strokeStyle = '#333333';
-        ctx.lineWidth = 1;
+        ctx.lineWidth = 1.5;
         for (let i = 0; i < 8; i++) {
             let angle = (Math.PI * i) / 7;
-            let x = Math.cos(angle) * 40;
-            let y = Math.sin(angle) * -20;
+            let x = Math.cos(angle) * 42;
+            let y = Math.sin(angle) * -22;
             ctx.beginPath();
             ctx.moveTo(0, -60);
             ctx.lineTo(x, y - 60);
             ctx.stroke();
         }
+        
+        // Umbrella tip
+        ctx.fillStyle = '#333333';
+        ctx.beginPath();
+        ctx.arc(0, -60, 3, 0, Math.PI * 2);
+        ctx.fill();
         
         ctx.restore();
     }
@@ -318,9 +382,10 @@ class RealisticUmbrella {
     throw() {
         if (!this.thrown) {
             this.thrown = true;
-            this.velocity.x = 3 + Math.random() * 2;
-            this.velocity.y = -5 - Math.random() * 3;
+            this.velocity.x = 4 + Math.random() * 2;
+            this.velocity.y = -6 - Math.random() * 2;
             animationState.hasUmbrella = false;
+            animationState.umbrellaThrown = true;
         }
     }
     
@@ -328,18 +393,22 @@ class RealisticUmbrella {
         if (this.thrown) {
             this.x += this.velocity.x;
             this.y += this.velocity.y;
-            this.velocity.y += 0.2;
-            this.rotation += 0.1;
+            this.velocity.y += 0.25; // gravity
+            this.rotation += 0.08;
             
-            if (this.y > canvas.height / dpi - 50) {
-                this.velocity.y *= -0.3;
-                this.velocity.x *= 0.8;
+            // Bounce off ground with energy loss
+            if (this.y > canvas.height / dpi - 60) {
+                this.velocity.y *= -0.4;
+                this.velocity.x *= 0.7;
+                if (Math.abs(this.velocity.y) < 1) {
+                    this.velocity.y = 0;
+                }
             }
         }
     }
 }
 
-// ========== RAIN SYSTEM ==========
+// ========== ULTRA-REALISTIC RAIN SYSTEM ==========
 class RainDrop {
     constructor() {
         this.reset();
@@ -348,23 +417,26 @@ class RainDrop {
     
     reset() {
         this.x = Math.random() * (canvas.width / dpi + 200) - 100;
-        this.y = -20;
-        this.speed = 8 + Math.random() * 4;
-        this.angle = animationState.isRunning ? 0 : 0.3;
-        this.length = 15 + Math.random() * 10;
-        this.opacity = 0.3 + Math.random() * 0.4;
+        this.y = -30;
+        this.speed = 10 + Math.random() * 6;
+        this.angle = animationState.isRunning ? 0 : 0.25;
+        this.length = 18 + Math.random() * 12;
+        this.opacity = 0.4 + Math.random() * 0.4;
+        this.thickness = 1 + Math.random() * 1;
     }
     
     update() {
         if (animationState.isRunning) {
+            // Rain appears vertical relative to running man
             this.x += 0;
             this.y += this.speed;
         } else {
+            // Diagonal rain when stationary
             this.x += this.speed * this.angle;
             this.y += this.speed;
         }
         
-        if (this.y > canvas.height / dpi + 20) {
+        if (this.y > canvas.height / dpi + 30) {
             this.reset();
         }
     }
@@ -373,7 +445,8 @@ class RainDrop {
         ctx.save();
         ctx.globalAlpha = this.opacity;
         ctx.strokeStyle = '#4fc3f7';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = this.thickness;
+        ctx.lineCap = 'round';
         ctx.beginPath();
         ctx.moveTo(this.x, this.y);
         
@@ -388,13 +461,15 @@ class RainDrop {
     }
 }
 
-// ========== VECTOR DRAWING WITH PERFECT MATH NOTATION ==========
-function drawVectorWithMath(x, y, dx, dy, color, label) {
+// ========== PERFECT VECTOR DRAWING ==========
+function drawVectorWithLabel(x, y, dx, dy, color, label) {
     ctx.save();
     
-    // Arrow shaft
+    // Vector arrow shaft
     ctx.strokeStyle = color;
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
     ctx.beginPath();
     ctx.moveTo(x, y);
     ctx.lineTo(x + dx, y + dy);
@@ -402,7 +477,7 @@ function drawVectorWithMath(x, y, dx, dy, color, label) {
     
     // Arrow head
     let angle = Math.atan2(dy, dx);
-    let headSize = 15;
+    let headSize = 20;
     
     ctx.fillStyle = color;
     ctx.beginPath();
@@ -418,182 +493,197 @@ function drawVectorWithMath(x, y, dx, dy, color, label) {
     ctx.closePath();
     ctx.fill();
     
-    // Perfect Math Label with Unicode
-    ctx.fillStyle = color;
-    ctx.font = 'bold 16px Times New Roman, serif';
-    ctx.textAlign = 'center';
+    // Vector label with background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(x + dx/2 - 25, y + dy/2 - 25, 50, 20);
     
-    // Use Unicode for vector notation
-    let vectorLabel = label.replace('v⃗', 'v⃗');
-    ctx.fillText(vectorLabel, x + dx/2, y + dy/2 - 10);
+    ctx.fillStyle = color;
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, x + dx/2, y + dy/2 - 10);
     
     ctx.restore();
 }
 
-// ========== PERFECT MATH NOTATION RENDERING ==========
-function renderMathNotation() {
-    // Update math display with perfect Unicode symbols
-    const formula = document.getElementById('formula');
-    const currentPhase = document.getElementById('currentPhase');
-    const explanation = document.getElementById('explanation');
-    
-    if (animationState.isRunning) {
-        currentPhase.textContent = 'Phase: Man running, umbrella thrown';
-        
-        // Perfect vector equation with Unicode
-        formula.innerHTML = `
-            <span style="color: #ef4444;">v⃗<sub>rain,man</sub></span> = 
-            <span style="color: #4ade80;">v⃗<sub>rain,ground</sub></span> − 
-            <span style="color: #3b82f6;">v⃗<sub>man</sub></span>
-        `;
-        
-        explanation.innerHTML = 'Rain appears <strong>vertical</strong> relative to running man';
-        document.getElementById('mathDisplay').style.borderColor = '#ef4444';
-    } else {
-        currentPhase.innerHTML = 'Phase: Man holding umbrella at angle <span style="color: #f59e0b;">θ</span>';
-        
-        formula.innerHTML = `
-            <span style="color: #4ade80;">v⃗<sub>rain,rel</sub></span> = 
-            <span style="color: #4ade80;">v⃗<sub>rain,ground</sub></span>
-        `;
-        
-        explanation.textContent = 'Rain hits umbrella diagonally';
-        document.getElementById('mathDisplay').style.borderColor = '#4ade80';
-    }
-    
-    // Re-render MathJax if available
-    if (window.MathJax && window.MathJax.typesetPromise) {
-        MathJax.typesetPromise([document.getElementById('mathDisplay')]);
-    }
-}
-
 // ========== INITIALIZE OBJECTS ==========
 let man = new RealisticMan(200, canvas.height / dpi - 50);
-let umbrella = new RealisticUmbrella(220, canvas.height / dpi - 130);
+let umbrella = new RealisticUmbrella(235, canvas.height / dpi - 130);
 let raindrops = [];
 
+// Create rain drops
 for (let i = 0; i < animationState.rainIntensity; i++) {
     raindrops.push(new RainDrop());
 }
 
-// ========== BACKGROUND DRAWING ==========
+// ========== BACKGROUND RENDERING ==========
 function drawBackground() {
-    // Sky gradient
+    // Dynamic sky gradient
     let gradient = ctx.createLinearGradient(0, 0, 0, canvas.height / dpi);
-    gradient.addColorStop(0, '#87ceeb');
-    gradient.addColorStop(0.3, '#98d4f0');
-    gradient.addColorStop(1, '#a9ddf5');
+    if (animationState.isRunning) {
+        gradient.addColorStop(0, '#708090');
+        gradient.addColorStop(0.3, '#87ceeb');
+        gradient.addColorStop(1, '#98d4f0');
+    } else {
+        gradient.addColorStop(0, '#87ceeb');
+        gradient.addColorStop(0.3, '#98d4f0');
+        gradient.addColorStop(1, '#a9ddf5');
+    }
     
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width / dpi, canvas.height / dpi);
     
-    // Animated clouds
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-    for (let i = 0; i < 5; i++) {
-        let x = (i * 250) + (animationState.time * 0.1) % 1500;
-        drawCloud(x, 50 + i * 20);
+    // Animated storm clouds
+    ctx.fillStyle = animationState.isRunning ? 'rgba(128, 128, 128, 0.8)' : 'rgba(255, 255, 255, 0.8)';
+    for (let i = 0; i < 6; i++) {
+        let x = (i * 200) + (animationState.time * 0.2) % 1400;
+        drawCloud(x, 40 + i * 15);
     }
     
-    // Ground
-    ctx.fillStyle = '#2d5016';
+    // Ground with grass texture
+    let groundGradient = ctx.createLinearGradient(0, canvas.height / dpi - 50, 0, canvas.height / dpi);
+    groundGradient.addColorStop(0, '#2d5016');
+    groundGradient.addColorStop(1, '#1a3009');
+    ctx.fillStyle = groundGradient;
     ctx.fillRect(0, canvas.height / dpi - 50, canvas.width / dpi, 50);
     
-    // Road
-    ctx.fillStyle = '#555555';
-    ctx.fillRect(0, canvas.height / dpi - 55, canvas.width / dpi, 10);
+    // Road surface
+    ctx.fillStyle = '#444444';
+    ctx.fillRect(0, canvas.height / dpi - 58, canvas.width / dpi, 12);
     
-    // Road markings
+    // Road center line
     ctx.strokeStyle = '#ffff00';
-    ctx.lineWidth = 3;
-    ctx.setLineDash([20, 20]);
+    ctx.lineWidth = 4;
+    ctx.setLineDash([30, 15]);
     ctx.beginPath();
-    ctx.moveTo(0, canvas.height / dpi - 50);
-    ctx.lineTo(canvas.width / dpi, canvas.height / dpi - 50);
+    ctx.moveTo(0, canvas.height / dpi - 52);
+    ctx.lineTo(canvas.width / dpi, canvas.height / dpi - 52);
     ctx.stroke();
     ctx.setLineDash([]);
 }
 
 function drawCloud(x, y) {
+    ctx.save();
     ctx.beginPath();
-    ctx.arc(x, y, 25, 0, Math.PI * 2);
-    ctx.arc(x + 25, y, 35, 0, Math.PI * 2);
-    ctx.arc(x + 50, y, 25, 0, Math.PI * 2);
-    ctx.arc(x + 25, y - 15, 20, 0, Math.PI * 2);
+    ctx.arc(x, y, 30, 0, Math.PI * 2);
+    ctx.arc(x + 30, y, 40, 0, Math.PI * 2);
+    ctx.arc(x + 60, y, 30, 0, Math.PI * 2);
+    ctx.arc(x + 30, y - 20, 25, 0, Math.PI * 2);
     ctx.fill();
+    ctx.restore();
 }
 
-// ========== VECTOR DRAWING WITH PERFECT MATH ==========
-function drawVectors() {
+// ========== VECTOR PHYSICS DISPLAY ==========
+function drawPhysicsVectors() {
     if (!man) return;
     
     let baseX = man.x;
-    let baseY = man.y - 150;
+    let baseY = man.y - 160;
     
     if (animationState.isRunning) {
-        // Rain relative to ground (diagonal, green)
-        drawVectorWithMath(
-            baseX - 100, baseY,
-            60, 120,
-            '#4ade80', 'v⃗rain,ground'
+        // Rain velocity relative to ground (diagonal, green)
+        drawVectorWithLabel(
+            baseX - 120, baseY,
+            70, 140,
+            '#22c55e', 'v_rain,ground'
         );
         
-        // Man velocity (horizontal, blue)  
-        drawVectorWithMath(
+        // Man velocity (horizontal, blue)
+        drawVectorWithLabel(
             baseX, baseY,
-            100, 0,
-            '#3b82f6', 'v⃗man'
+            120, 0,
+            '#3b82f6', 'v_man'
         );
         
-        // Rain relative to man (vertical, red)
-        drawVectorWithMath(
-            baseX + 150, baseY,
-            0, 120,
-            '#ef4444', 'v⃗rain,man'
+        // Rain velocity relative to man (vertical, red)
+        drawVectorWithLabel(
+            baseX + 160, baseY,
+            0, 140,
+            '#ef4444', 'v_rain,man'
         );
     } else {
-        // Rain vector when stationary
-        drawVectorWithMath(
+        // Rain vector when stationary (diagonal, green)
+        drawVectorWithLabel(
             baseX, baseY,
-            60, 120,
-            '#4ade80', 'v⃗rain'
+            70, 140,
+            '#22c55e', 'v_rain'
         );
         
-        // Theta angle indicator
-        if (animationState.hasUmbrella) {
+        // Theta angle visualization
+        if (animationState.hasUmbrella && umbrella) {
             ctx.save();
             
-            // Vertical reference line
+            // Vertical reference line (dashed)
             ctx.strokeStyle = '#f59e0b';
             ctx.lineWidth = 3;
-            ctx.setLineDash([5, 5]);
+            ctx.setLineDash([8, 4]);
             ctx.beginPath();
             ctx.moveTo(umbrella.x, umbrella.y);
-            ctx.lineTo(umbrella.x, umbrella.y - 80);
+            ctx.lineTo(umbrella.x, umbrella.y - 90);
             ctx.stroke();
             
             // Angle arc
             ctx.strokeStyle = '#f59e0b';
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 4;
             ctx.setLineDash([]);
             ctx.beginPath();
-            ctx.arc(umbrella.x, umbrella.y, 30, -Math.PI/2, umbrella.angle, false);
+            ctx.arc(umbrella.x, umbrella.y, 40, -Math.PI/2, umbrella.angle, false);
             ctx.stroke();
             
-            // Perfect θ symbol
+            // Theta label with background
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(umbrella.x + 50, umbrella.y - 35, 30, 25);
+            
             ctx.fillStyle = '#f59e0b';
-            ctx.font = 'bold 24px Times New Roman, serif';
+            ctx.font = 'bold 20px Times New Roman, serif';
             ctx.textAlign = 'center';
-            ctx.fillText('θ', umbrella.x + 45, umbrella.y - 15);
+            ctx.fillText('θ', umbrella.x + 65, umbrella.y - 15);
             
             ctx.restore();
         }
     }
 }
 
+// ========== PERFECT MATH NOTATION SYSTEM ==========
+function updateMathNotation() {
+    const formula = document.getElementById('formula');
+    const currentPhase = document.getElementById('currentPhase');
+    const explanation = document.getElementById('explanation');
+    
+    if (animationState.isRunning) {
+        currentPhase.innerHTML = 'Phase: <span style="color: #4ecdc4;">Man running</span>, umbrella thrown';
+        
+        formula.innerHTML = `
+            $$\\color{red}{\\vec{v}_{\\mathrm{rain,man}}} = \\color{green}{\\vec{v}_{\\mathrm{rain,ground}}} - \\color{blue}{\\vec{v}_{\\mathrm{man}}}$$
+        `;
+        
+        explanation.innerHTML = 'Rain appears <strong>vertical</strong> relative to the running man';
+        document.getElementById('mathDisplay').style.borderColor = '#ef4444';
+        
+    } else {
+        currentPhase.innerHTML = 'Phase: Man holding umbrella at angle <span style="color: #f59e0b;">θ</span>';
+        
+        formula.innerHTML = `
+            $$\\color{green}{\\vec{v}_{\\mathrm{rain,rel}}} = \\color{green}{\\vec{v}_{\\mathrm{rain,ground}}}$$
+        `;
+        
+        explanation.innerHTML = 'Rain hits umbrella <strong>diagonally</strong> from above';
+        document.getElementById('mathDisplay').style.borderColor = '#22c55e';
+    }
+    
+    // Re-render MathJax
+    if (window.MathJax && window.MathJax.typesetPromise) {
+        MathJax.typesetPromise([document.getElementById('mathDisplay')]).catch(function (err) {
+            console.log('MathJax typeset error: ' + err.message);
+        });
+    }
+}
+
 // ========== MAIN ANIMATION LOOP ==========
 function animate() {
     if (!animationState.isPaused) {
-        ctx.clearRect(0, 0, canvas.width / dpi, canvas.height / dpi);
+        // Clear canvas with slight trail effect for motion blur
+        ctx.fillStyle = 'rgba(135, 206, 235, 0.1)';
+        ctx.fillRect(0, 0, canvas.width / dpi, canvas.height / dpi);
         
         drawBackground();
         
@@ -606,29 +696,37 @@ function animate() {
         // Update man position
         if (animationState.isRunning) {
             man.x += animationState.manSpeed;
-            if (man.x > canvas.width / dpi + 50) {
-                man.x = -50;
+            
+            // Loop man position
+            if (man.x > canvas.width / dpi + 100) {
+                man.x = -100;
             }
         }
         
+        // Draw man
         man.draw();
         
-        // Update umbrella
+        // Update umbrella position when held
         if (animationState.hasUmbrella && !umbrella.thrown) {
-            umbrella.x = man.x + 20;
-            umbrella.y = man.y - 80;
+            umbrella.x = man.x + 35;
+            umbrella.y = man.y - 75;
         }
         
-        if (umbrella.thrown || !animationState.hasUmbrella) {
+        // Update thrown umbrella
+        if (umbrella.thrown || animationState.umbrellaThrown) {
             umbrella.update();
         }
         
-        if (!umbrella.thrown || umbrella.y < canvas.height / dpi - 50) {
+        // Draw umbrella
+        if (!umbrella.thrown || umbrella.y < canvas.height / dpi - 45) {
             umbrella.draw();
         }
         
-        drawVectors();
-        renderMathNotation();
+        // Draw physics vectors
+        drawPhysicsVectors();
+        
+        // Update math notation
+        updateMathNotation();
         
         animationState.time++;
     }
@@ -642,28 +740,34 @@ function startRunning() {
         animationState.isRunning = true;
         umbrella.throw();
         document.getElementById('playBtn').classList.add('running');
-        document.getElementById('playBtn').textContent = '🏃 Running...';
+        document.getElementById('playBtn').innerHTML = '🏃 Running...';
     }
 }
 
 function pauseAnimation() {
     animationState.isPaused = !animationState.isPaused;
     const pauseBtn = document.getElementById('pauseBtn');
-    pauseBtn.textContent = animationState.isPaused ? '▶️ Resume' : '⏸️ Pause';
+    pauseBtn.innerHTML = animationState.isPaused ? '▶️ Resume' : '⏸️ Pause';
 }
 
 function resetAnimation() {
     animationState.isRunning = false;
     animationState.isPaused = false;
     animationState.hasUmbrella = true;
+    animationState.umbrellaThrown = false;
+    
     man.x = 200;
+    man.runCycle = 0;
+    
     umbrella.thrown = false;
-    umbrella.x = 220;
+    umbrella.x = 235;
     umbrella.y = canvas.height / dpi - 130;
+    umbrella.velocity = { x: 0, y: 0 };
+    umbrella.rotation = 0;
     
     document.getElementById('playBtn').classList.remove('running');
-    document.getElementById('playBtn').textContent = '▶️ Start Running';
-    document.getElementById('pauseBtn').textContent = '⏸️ Pause';
+    document.getElementById('playBtn').innerHTML = '▶️ Start Running';
+    document.getElementById('pauseBtn').innerHTML = '⏸️ Pause';
 }
 
 // ========== EVENT LISTENERS ==========
@@ -679,7 +783,7 @@ document.getElementById('rainSlider').addEventListener('input', (e) => {
         for (let i = 0; i < difference; i++) {
             raindrops.push(new RainDrop());
         }
-    } else {
+    } else if (difference < 0) {
         raindrops.splice(0, Math.abs(difference));
     }
     
@@ -690,14 +794,17 @@ document.getElementById('speedSlider').addEventListener('input', (e) => {
     animationState.manSpeed = parseFloat(e.target.value);
 });
 
+// Click canvas to start
 canvas.addEventListener('click', startRunning);
 
-// ========== START ANIMATION ==========
-animate();
-
-console.log('🎬 ULTIMATE 2D Physics Animation with PERFECT Math Notation!');
-console.log('🌧️ Features: Unicode vectors, MathJax support, realistic graphics');
-console.log('🎮 Click to interact!');
+// ========== START THE ULTIMATE ANIMATION ==========
+// Wait for MathJax to load, then start
+setTimeout(() => {
+    animate();
+    console.log('🎬 ULTIMATE 2D Physics Animation Started!');
+    console.log('🌧️ Perfect Math Notation with \\mathrm{vec} rendering!');
+    console.log('🎮 Click to interact and enjoy the physics!');
+}, 1000);
 
 </script>
 
